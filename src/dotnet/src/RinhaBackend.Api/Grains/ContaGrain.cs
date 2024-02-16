@@ -31,12 +31,16 @@ public sealed class ContaGrain(
     }
 
 
-    public ValueTask<ContaSaldo> DebitarValor(uint valor, string descricao)
+    public ValueTask<(bool valido, ContaSaldo saldo)> DebitarValor(uint valor, string descricao)
     {
-        state.State = state.State.DebitarValor(valor, descricao);
+        var (valido, saldo) = state.State.DebitarValor(valor, descricao);
 
-        return new ValueTask<ContaSaldo>(
-                new ContaSaldo(state.State.Limite, state.State.Saldo));
+        if (valido)
+            state.State = saldo;
+
+        return new ValueTask<(bool, ContaSaldo)>(
+                (valido,
+                new ContaSaldo(state.State.Limite, state.State.Saldo)));
     }
 
     public ValueTask<ContaExtrato> ObterExtrato()

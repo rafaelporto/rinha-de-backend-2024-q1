@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using RinhaBackend.Api.Grains;
+using RinhaBackend.Api.Models;
 
 namespace RinhaBackend.Api.Endpoints;
 
@@ -7,19 +8,46 @@ public static class TransacaoEndpoint
 {
     public static RouteHandlerBuilder MapPostTransacao(this IEndpointRouteBuilder app)
     {
-        return app.MapPost("/clientes/{id:int}/transacoes",
+        return app.MapPost("/clientes/{id:regex([1-5])}/transacoes",
                     async (int id,
-                     [FromBody] TransacaoRequest transacao,
+                     [FromBody] Transacao transacao,
                      IGrainFactory grains) =>
         {
+            if (transacao.IsInvalid())
+                return Results.BadRequest();
+
             var conta = grains.GetGrain<IContaGrain>(id);
 
-            if (transacao.Tipo == 'd')
-                return Results.Ok(await conta.DebitarValor(transacao.Valor, transacao.Descricao));
+            if (transacao.IsDebito)
+            {
+                (bool valido, ContaSaldo saldo) = await conta.DebitarValor(transacao.Valor!.Value,
+                                                transacao.Descricao!);
 
-            return Results.Ok(await conta.CreditarValor(transacao.Valor, transacao.Descricao));
+                return valido
+                    ? Results.Ok(saldo)
+                    : Results.UnprocessableEntity();
+            }
+
+            return Results.Ok(await conta.CreditarValor(transacao.Valor!.Value, transacao.Descricao!));
         });
     }
+
 }
 
-public record TransacaoRequest(uint Valor, char Tipo, string Descricao);
+public record Transacao(uint? Valor, char? Tipo, string? Descricao)
+{
+    public bool IsDebito => Tipo == 'd';
+
+    public bool IsValid()
+    {
+        return Valor.HasValue
+        && Tipo.HasValue
+        && string.IsNullOrWhiteSpace(Descricao) is false
+        && Descricao.Length <= 10
+        && (Tipo == 'd' || Tipo == 'c');
+    }
+
+    public bool IsInvalid() => !IsValid();
+}
+
+

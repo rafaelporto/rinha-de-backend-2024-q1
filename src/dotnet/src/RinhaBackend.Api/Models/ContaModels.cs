@@ -21,20 +21,33 @@ public sealed class Conta
     public Conta CreditarValor(uint valor, string descricao)
     {
         Saldo += (int)valor;
-        Extrato.Push(new EntradaExtrato(descricao, (int)valor, 'c', DateTime.Now));
+        AdicionarEntradaExtrato(descricao, valor, 'c');
         return this;
     }
 
-    public Conta DebitarValor(uint valor, string descricao)
+    public (bool, Conta) DebitarValor(uint valor, string descricao)
     {
+        if (Saldo + Limite - valor < 0)
+            return (false, this);
+
         Saldo -= (int)valor;
-        Extrato.Push(new EntradaExtrato(descricao, (int)valor, 'd', DateTime.Now));
-        return this;
+        AdicionarEntradaExtrato(descricao, valor, 'd');
+        return (true, this);
     }
 
     public ContaSaldo ObterSaldo()
     {
         return new(Limite, Saldo);
+    }
+
+    private void AdicionarEntradaExtrato(string descricao, in uint valor, in char tipo)
+    {
+        if (Extrato.Count == 10)
+        {
+            EntradaExtrato _ = Extrato.Pop();
+        }
+
+        Extrato.Push(new EntradaExtrato(descricao, valor, tipo, DateTime.Now));
     }
 }
 
@@ -96,7 +109,7 @@ public record struct EntradaExtrato
     public string Descricao { get; set; }
 
     [Id(1)]
-    public int Valor { get; set; }
+    public uint Valor { get; set; }
 
     [Id(2)]
     public char Tipo { get; set; }
@@ -105,7 +118,7 @@ public record struct EntradaExtrato
     [JsonPropertyName("realizada_em")]
     public DateTime RealizadaEm { get; set; }
 
-    public EntradaExtrato(string descricao, int valor, char tipo, DateTime realizadoEm)
+    public EntradaExtrato(string descricao, uint valor, char tipo, DateTime realizadoEm)
     {
         Descricao = descricao;
         Valor = valor;

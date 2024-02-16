@@ -12,7 +12,7 @@ public interface IContaGrain : IGrainWithIntegerKey
     ValueTask<ContaSaldo> CreditarValor(uint valor, string descricao);
 
     [Alias("DebitarValor")]
-    ValueTask<ContaSaldo> DebitarValor(uint valor, string descricao);
+    ValueTask<(bool valido, ContaSaldo saldo)> DebitarValor(uint valor, string descricao);
 
     [Alias("ObterExtrato")]
     ValueTask<ContaExtrato> ObterExtrato();
