@@ -1,14 +1,22 @@
-using  RinhaBackend.Api.Endpoints;
-using RinhaBackend.Api.Grains;
+using Orleans.Runtime.Hosting;
+using RinhaBackend.Api.Data;
+using RinhaBackend.Api.Endpoints;
+using RinhaBackend.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseOrleans(static siloBuilder =>
 {
     siloBuilder.UseLocalhostClustering();
-    siloBuilder.AddMemoryGrainStorage("contas");
+    siloBuilder.Services.AddGrainStorage("contasStorage",
+        (serviceProvider, name) => serviceProvider.GetRequiredKeyedService<ContaGrainStorage>("contasStorage"));
 });
 
+builder.Services.AddSingleton<Store>();
+builder.Services.AddSingleton<IStore>(provider => provider.GetRequiredService<Store>());
+builder.Services.AddHostedService(provider => provider.GetRequiredService<Store>());
+builder.Services.AddKeyedSingleton<ContaGrainStorage>("contasStorage");
+builder.Services.AddHostedService<GrainsWarmUpService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -25,9 +33,7 @@ if (app.Environment.IsDevelopment())
             });
 }
 
-app.MapPostCriarContas();
 app.MapPostTransacao();
 app.MapGetExtrato();
 
 app.Run();
-

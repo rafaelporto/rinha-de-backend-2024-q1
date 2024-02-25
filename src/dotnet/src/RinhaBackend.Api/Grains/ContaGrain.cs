@@ -1,54 +1,65 @@
+using Orleans.Providers;
+using RinhaBackend.Api.Data;
 using RinhaBackend.Api.Models;
 
 namespace RinhaBackend.Api.Grains;
 
+[StorageProvider(ProviderName = "contasStorage")]
 public sealed class ContaGrain(
-    [PersistentState(
-        stateName: "conta",
-        storageName: "contas")]
-        IPersistentState<Conta> state)
-    : Grain, IContaGrain
+    IStore store)
+    : Grain<Conta>, IContaGrain
 {
-
-    public async ValueTask CriarConta(NovaConta conta)
+   public async ValueTask<ContaSaldo> CreditarValor(uint valor, string descricao)
     {
-        state.State = new()
-        {
-            Id = (int)this.GetPrimaryKeyLong(),
-            Limite = conta.Limite,
-            Saldo = conta.Saldo
-        };
+        State = State.CreditarValor(valor, descricao, out var transacao);
 
-        await state.WriteStateAsync();
+        var transacaoDbEntity = TransacaoEntity.New(State.Id, transacao);
+
+        await store.Insert(transacaoDbEntity).ConfigureAwait(false);
+
+        return new ContaSaldo(State.Limite, State.Saldo);
     }
 
-    public ValueTask<ContaSaldo> CreditarValor(uint valor, string descricao)
+    public async ValueTask<(bool valido, ContaSaldo saldo)> DebitarValor(uint valor, string descricao)
     {
-        state.State = state.State.CreditarValor(valor, descricao);
-
-        return new ValueTask<ContaSaldo>(
-                new ContaSaldo(state.State.Limite, state.State.Saldo));
-    }
-
-
-    public ValueTask<(bool valido, ContaSaldo saldo)> DebitarValor(uint valor, string descricao)
-    {
-        var (valido, saldo) = state.State.DebitarValor(valor, descricao);
+        var (valido, saldo) = State.DebitarValor(valor, descricao, out var maybeTransacao);
 
         if (valido)
-            state.State = saldo;
+        {
+            State = saldo;
+            var transacaoEntity = TransacaoEntity.New(State.Id, maybeTransacao!);
+            await store.Insert(transacaoEntity).ConfigureAwait(false);
+        }
 
-        return new ValueTask<(bool, ContaSaldo)>(
-                (valido,
-                new ContaSaldo(state.State.Limite, state.State.Saldo)));
+        return (valido, new ContaSaldo(State.Limite, State.Saldo));
     }
 
     public ValueTask<ContaExtrato> ObterExtrato()
     {
-        Conta conta = state.State;
-        ContaExtrato extrato = new(new ContaSaldoExtrato(conta.Limite, conta.Saldo), conta.Extrato);
+        Conta conta = State;
+        ContaExtrato extrato = new(new ContaSaldoExtrato(conta.Limite, conta.Saldo), [.. conta.Extrato]);
 
         return new ValueTask<ContaExtrato>(extrato);
     }
-}
 
+    public async Task CarregarOuCriarConta(NovaConta novaConta)
+    {
+        if (State is not null)
+            return;
+
+        State = new()
+        {
+            Id = this.GetPrimaryKeyString(),
+            Limite = novaConta.Limite,
+            Saldo = novaConta.Saldo
+        };
+
+        await WriteStateAsync();
+    }
+
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    {
+        await WriteStateAsync();
+        await base.OnDeactivateAsync(reason, cancellationToken);
+    }
+}
