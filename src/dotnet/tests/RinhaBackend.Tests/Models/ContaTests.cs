@@ -10,7 +10,7 @@ public class ContaTests
     {
         Conta conta = new()
         {
-            Id = "1",
+            Id = 1,
             Saldo = 100,
             Limite = 100000
         };
@@ -23,7 +23,7 @@ public class ContaTests
     {
         Conta conta = new()
         {
-            Id = "1",
+            Id = 1,
             Saldo = 100,
             Limite = 100000
         };
@@ -37,7 +37,7 @@ public class ContaTests
     {
         Conta conta = new()
         {
-            Id = "1",
+            Id = 1,
             Saldo = 0,
             Limite = 1000
         };
@@ -72,7 +72,7 @@ public class ContaTests
     {
         Conta conta = new()
         {
-            Id = "1",
+            Id = 1,
             Saldo = 100,
             Limite = 100000
         };

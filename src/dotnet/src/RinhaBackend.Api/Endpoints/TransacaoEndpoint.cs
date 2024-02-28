@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using RinhaBackend.Api.Grains;
 using RinhaBackend.Api.Models;
@@ -9,7 +10,7 @@ public static class TransacaoEndpoint
     public static RouteHandlerBuilder MapPostTransacao(this IEndpointRouteBuilder app)
     {
         return app.MapPost("/clientes/{id:regex([1-5])}/transacoes",
-                    async (string id,
+                    async (int id,
                      [FromBody] Transacao transacao,
                      IGrainFactory grains) =>
         {
@@ -41,6 +42,7 @@ public static class TransacaoEndpoint
 
 public record Transacao(object Valor, char? Tipo, string? Descricao)
 {
+    [JsonIgnore]
     public bool IsDebito => Tipo == 'd';
 
     public bool IsValid()

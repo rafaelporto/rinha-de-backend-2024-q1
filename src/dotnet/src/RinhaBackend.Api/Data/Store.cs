@@ -1,69 +1,36 @@
 using System.Buffers;
+using System.Text.Json;
 using System.Threading.Channels;
-using Orleans;
-using Raven.Client.Documents;
-using Raven.Client.Documents.BulkInsert;
-using Raven.Client.Documents.Operations;
-using Raven.Client.Documents.Session;
-using Raven.Client.Exceptions.Database;
-using Raven.Client.Http;
-using Raven.Client.ServerWide;
-using Raven.Client.ServerWide.Operations;
+using Microsoft.Extensions.Options;
+using MySql.Data.MySqlClient;
+using RinhaBackend.Api.Models;
 
 namespace RinhaBackend.Api.Data;
 
 public interface IStore
 {
-    IAsyncDocumentSession OpenSession();
     ValueTask Insert(TransacaoEntity entity);
+    ValueTask<Conta?> ReadContaAsync(int id);
+    ValueTask UpsertAsync(GrainEntity<Conta> entity);
 }
 
-public sealed partial class Store: BackgroundService, IStore, IDisposable
+public sealed partial class Store : BackgroundService, IStore, IDisposable
 {
-    private const string DB_NAME = "rinhadb";
-    private readonly DocumentStore _store;
     private readonly Channel<TransacaoEntity> _transacaoChannel;
     private readonly ChannelWriter<TransacaoEntity> _channelWriter;
     private readonly ChannelReader<TransacaoEntity> _channelReader;
-    const int MAX_BULK_INSERT = 10_000;
+    private readonly ClusterConfig _options;
+    const int MAX_BULK_INSERT = 1_000;
 
-    public Store()
+    public Store(IOptions<ClusterConfig> options)
     {
-        _store = new DocumentStore()
-        {
-            Urls = ["http://localserver:8080"],
-            Database = DB_NAME,
-            Conventions = {
-                DisableTcpCompression = false,
-                HttpCompressionAlgorithm = HttpCompressionAlgorithm.Gzip,
-            }
-        };
-
-        _store.Initialize();
-        EnsureDatabaseIsCreated();
+        ArgumentNullException.ThrowIfNull(options);
+        _options = options.Value;
 
         _transacaoChannel = Channel.CreateBounded<TransacaoEntity>(1000);
         _channelWriter = _transacaoChannel.Writer;
         _channelReader = _transacaoChannel.Reader;
     }
-
-    public void EnsureDatabaseIsCreated()
-    {
-        try
-        {
-            _store.Maintenance
-                .ForDatabase(DB_NAME)
-                .Send(new GetStatisticsOperation());
-        }
-        catch (DatabaseDoesNotExistException)
-        {
-            _store.Maintenance.Server
-                .Send(new CreateDatabaseOperation(
-                            new DatabaseRecord(DB_NAME)));
-        }
-    }
-
-    public IAsyncDocumentSession OpenSession() => _store.OpenAsyncSession();
 
     public async ValueTask Insert(TransacaoEntity entity) =>
         await _channelWriter.WriteAsync(entity);
@@ -85,28 +52,99 @@ public sealed partial class Store: BackgroundService, IStore, IDisposable
             if (index == 0)
                 continue;
 
-            BulkInsertOperation bulkInsert = default!;
+            using var dbConnection = new MySqlConnection(_options.ConnectionString);
             try
             {
-                bulkInsert = _store.BulkInsert(token: stoppingToken);
+                await dbConnection.OpenAsync(stoppingToken);
+
+                using var command = dbConnection.CreateCommand();
+
+                command.CommandText = "INSERT INTO transacoes (conta_id, content) VALUES (@conta_id, @content)";
+
                 for (int i = 0; i < index; i++)
                 {
-                    await bulkInsert.StoreAsync(dbEntryPool[i]);
+                    var entity = dbEntryPool[i];
+                    command.Parameters.Clear();
+                    command.Parameters.AddWithValue("@conta_id", entity.ContaId);
+                    command.Parameters.AddWithValue("@content", JsonSerializer.SerializeToUtf8Bytes(entity.Transacao));
                 }
+
+                await command.ExecuteNonQueryAsync(stoppingToken);
+
             }
             finally
             {
-                if (bulkInsert is not null)
-                    await bulkInsert.DisposeAsync().ConfigureAwait(false);
+                await dbConnection.CloseAsync();
             }
         }
 
         ArrayPool<TransacaoEntity>.Shared.Return(dbEntryPool);
     }
 
+
+
     public override void Dispose()
     {
-        _store.Dispose();
+        _channelReader.Completion.Wait();
         base.Dispose();
+    }
+
+    public async ValueTask<Conta?> ReadContaAsync(int id)
+    {
+        using var dbConnection = new MySqlConnection(_options.ConnectionString);
+
+        try
+        {
+            dbConnection.Open();
+
+            using var command = dbConnection.CreateCommand();
+            command.CommandText = "SELECT * FROM contas WHERE id = @id";
+            command.Parameters.AddWithValue("@id", id);
+
+            using var reader = await command.ExecuteReaderAsync();
+
+            if (reader.Read())
+            {
+                var content = reader["content"].ToString()!;
+                return JsonSerializer.Deserialize<Conta>(content);
+            }
+        }catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+        finally
+        {
+            dbConnection.Close();
+        }
+
+        return null;
+    }
+
+    public async ValueTask UpsertAsync(GrainEntity<Conta> entity)
+    {
+        using var dbConnection = new MySqlConnection(_options.ConnectionString);
+
+        try
+        {
+            dbConnection.Open();
+
+            var sql = """
+                INSERT INTO contas (id, content)
+                VALUES (@id, @content) 
+                ON DUPLICATE KEY UPDATE 
+                content = VALUES(content)
+            """;
+
+            using var command = new MySqlCommand(sql, dbConnection);
+
+            command.Parameters.AddWithValue("@id", entity.Id);
+            command.Parameters.AddWithValue("@content", JsonSerializer.SerializeToUtf8Bytes(entity.State));
+
+            await command.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            await dbConnection.CloseAsync();
+        }
     }
 }

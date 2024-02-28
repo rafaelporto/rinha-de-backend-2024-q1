@@ -3,7 +3,7 @@ using RinhaBackend.Api.Models;
 namespace RinhaBackend.Api.Grains;
 
 [Alias("IContaGrain")]
-public interface IContaGrain : IGrainWithStringKey
+public interface IContaGrain : IGrainWithIntegerKey
 {
     [Alias("CreditarValor")]
     ValueTask<ContaSaldo> CreditarValor(uint valor, string descricao);
@@ -13,7 +13,4 @@ public interface IContaGrain : IGrainWithStringKey
 
     [Alias("ObterExtrato")]
     ValueTask<ContaExtrato> ObterExtrato();
-
-    [Alias("CarregarOuCriarConta")]
-    Task CarregarOuCriarConta(NovaConta novaConta);
 }

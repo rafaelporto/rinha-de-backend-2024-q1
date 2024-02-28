@@ -4,7 +4,7 @@ namespace RinhaBackend.Api.Models;
 public sealed class Conta
 {
     [Id(0)]
-    public string Id { get; set; }
+    public int Id { get; set; }
 
     [Id(1)]
     public uint Limite { get; set; } = 0;
@@ -14,6 +14,11 @@ public sealed class Conta
 
     [Id(3)]
     public LinkedList<Transacao> Extrato { get; set; } = new();
+
+    public bool IsValid()
+    {
+        return Id > 0 && Limite > 0;
+    }
 
     public Conta CreditarValor(uint valor, string descricao, out Transacao transacao)
     {

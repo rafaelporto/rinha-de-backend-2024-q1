@@ -1,65 +1,71 @@
-using Orleans.Providers;
+using System.Text.Json;
 using RinhaBackend.Api.Data;
 using RinhaBackend.Api.Models;
 
 namespace RinhaBackend.Api.Grains;
 
-[StorageProvider(ProviderName = "contasStorage")]
-public sealed class ContaGrain(
-    IStore store)
-    : Grain<Conta>, IContaGrain
+public sealed class ContaGrain : Grain, IContaGrain
 {
-   public async ValueTask<ContaSaldo> CreditarValor(uint valor, string descricao)
+    private Conta Conta { get; set; }
+    private readonly IStore _store;
+
+    public ContaGrain(IStore store)
     {
-        State = State.CreditarValor(valor, descricao, out var transacao);
+        _store = store;
+        Conta = new() { Id = (int)this.GetPrimaryKeyLong() };
+    }
 
-        var transacaoDbEntity = TransacaoEntity.New(State.Id, transacao);
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        var maybeConta = await _store.ReadContaAsync((int)this.GetPrimaryKeyLong());
 
-        await store.Insert(transacaoDbEntity).ConfigureAwait(false);
+        Conta = maybeConta ?? new() { Id = (int)this.GetPrimaryKeyLong() };
 
-        return new ContaSaldo(State.Limite, State.Saldo);
+        await base.OnActivateAsync(cancellationToken);
+    }
+
+    public async ValueTask<ContaSaldo> CreditarValor(uint valor, string descricao)
+    {
+        Conta = Conta.CreditarValor(valor, descricao, out Transacao transacao);
+
+        var dbEntity = TransacaoEntity.New(Conta.Id, transacao);
+
+        await _store.Insert(dbEntity).ConfigureAwait(false);
+
+        return new ContaSaldo(Conta.Limite, Conta.Saldo);
     }
 
     public async ValueTask<(bool valido, ContaSaldo saldo)> DebitarValor(uint valor, string descricao)
     {
-        var (valido, saldo) = State.DebitarValor(valor, descricao, out var maybeTransacao);
+        var (valido, saldo) = Conta.DebitarValor(valor, descricao, out var maybeTransacao);
 
         if (valido)
         {
-            State = saldo;
-            var transacaoEntity = TransacaoEntity.New(State.Id, maybeTransacao!);
-            await store.Insert(transacaoEntity).ConfigureAwait(false);
+            Conta = saldo;
+            var transacaoEntity = TransacaoEntity.New(Conta.Id, maybeTransacao!);
+            await _store.Insert(transacaoEntity).ConfigureAwait(false);
         }
 
-        return (valido, new ContaSaldo(State.Limite, State.Saldo));
+        return (valido, new ContaSaldo(Conta.Limite, Conta.Saldo));
     }
 
     public ValueTask<ContaExtrato> ObterExtrato()
     {
-        Conta conta = State;
+        Conta conta = Conta;
         ContaExtrato extrato = new(new ContaSaldoExtrato(conta.Limite, conta.Saldo), [.. conta.Extrato]);
 
         return new ValueTask<ContaExtrato>(extrato);
-    }
-
-    public async Task CarregarOuCriarConta(NovaConta novaConta)
-    {
-        if (State is not null)
-            return;
-
-        State = new()
-        {
-            Id = this.GetPrimaryKeyString(),
-            Limite = novaConta.Limite,
-            Saldo = novaConta.Saldo
-        };
-
-        await WriteStateAsync();
     }
 
     public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
         await WriteStateAsync();
         await base.OnDeactivateAsync(reason, cancellationToken);
+    }
+
+    private async ValueTask WriteStateAsync()
+    {
+        GrainEntity<Conta> grainEntity = new(Conta.Id, Conta);
+        await _store.UpsertAsync(grainEntity).ConfigureAwait(false);
     }
 }

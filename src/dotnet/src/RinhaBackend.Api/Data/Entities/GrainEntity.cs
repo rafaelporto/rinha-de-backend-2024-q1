@@ -1,12 +1,9 @@
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace RinhaBackend.Api.Data;
 
-public class GrainEntity<TState>
+public class GrainEntity<TState>(int id, TState state)
 {
-    public string? Id { get; set; }
-
-    public string StateName { get; set; } = default!;
-
-    public TState State { get; set; } = default!;
+    public int? Id { get; set; } = id;
+    public TState State { get; set; } = state;
 }

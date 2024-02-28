@@ -70,7 +70,9 @@ public record Transacao
     [JsonPropertyName("realizada_em")]
     public DateTimeOffset RealizadaEm { get; set; }
 
-    public Transacao(string descricao, uint valor, char tipo, DateTimeOffset realizadoEm)
+    public Transacao() { }
+
+    public Transacao(string descricao, uint valor, char tipo, DateTimeOffset realizadoEm): base()
     {
         Descricao = descricao;
         Valor = valor;
