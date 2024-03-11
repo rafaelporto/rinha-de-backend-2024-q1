@@ -3,22 +3,6 @@ using System.Text.Json.Serialization;
 
 namespace RinhaBackend.Api.Models;
 
-[GenerateSerializer, Alias(nameof(NovaConta))]
-public record struct NovaConta
-{
-    [Id(0)]
-    public uint Limite { get; set; }
-    [Id(1)]
-    public int Saldo { get; set; }
-
-
-    public NovaConta(uint limite, int saldo)
-    {
-        Limite = limite;
-        Saldo = saldo;
-    }
-}
-
 [GenerateSerializer, Alias(nameof(ContaSaldo))]
 public record struct ContaSaldo
 {
@@ -51,33 +35,6 @@ public record struct ContaSaldoExtrato
         Limite = limite;
         Total = total;
         DataExtrato = DateTimeOffset.UtcNow;
-    }
-}
-
-[GenerateSerializer, Alias(nameof(Transacao))]
-public record Transacao
-{
-    [Id(0)]
-    public string Descricao { get; set; }
-
-    [Id(1)]
-    public uint Valor { get; set; }
-
-    [Id(2)]
-    public char Tipo { get; set; }
-
-    [Id(3)]
-    [JsonPropertyName("realizada_em")]
-    public DateTimeOffset RealizadaEm { get; set; }
-
-    public Transacao() { }
-
-    public Transacao(string descricao, uint valor, char tipo, DateTimeOffset realizadoEm): base()
-    {
-        Descricao = descricao;
-        Valor = valor;
-        Tipo = tipo;
-        RealizadaEm = realizadoEm;
     }
 }
 

@@ -126,7 +126,7 @@ CREATE TABLE `contas` (
 
 LOCK TABLES `contas` WRITE;
 /*!40000 ALTER TABLE `contas` DISABLE KEYS */;
-INSERT INTO `contas` VALUES (1,'{\"Id\":1,\"Limite\":100000,\"Saldo\":0,\"Extrato\":[]}'),(2,'{\"Id\":2,\"Limite\":80000,\"Saldo\":0,\"Extrato\":[]}'),(3,'{\"Id\":3,\"Limite\":1000000,\"Saldo\":0,\"Extrato\":[]}'),(4,'{\"Id\":4,\"Limite\":10000000,\"Saldo\":0,\"Extrato\":[]}'),(5,'{\"Id\":5,\"Limite\":500000,\"Saldo\":0,\"Extrato\":[]}');
+INSERT INTO `contas` VALUES (1,'{\"id\":1,\"limite\":100000,\"saldo\":0,\"extrato\":[]}'),(2,'{\"id\":2,\"limite\":80000,\"saldo\":0,\"extrato\":[]}'),(3,'{\"id\":3,\"limite\":1000000,\"saldo\":0,\"extrato\":[]}'),(4,'{\"id\":4,\"limite\":10000000,\"saldo\":0,\"extrato\":[]}'),(5,'{\"id\":5,\"limite\":500000,\"saldo\":0,\"extrato\":[]}');
 /*!40000 ALTER TABLE `contas` ENABLE KEYS */;
 UNLOCK TABLES;
 

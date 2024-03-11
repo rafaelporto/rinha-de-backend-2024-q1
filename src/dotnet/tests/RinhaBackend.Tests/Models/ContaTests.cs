@@ -1,3 +1,5 @@
+using MySqlX.XDevAPI.Common;
+using RinhaBackend.Api;
 using RinhaBackend.Api.Models;
 
 namespace RinhaBackend.Tests.Contas;
@@ -14,8 +16,8 @@ public class ContaTests
             Saldo = 100,
             Limite = 100000
         };
-        Conta sut = conta.CreditarValor(100, "teste", out var _);
-        Assert.Equal(200, sut.Saldo);
+        (Conta conta, Transacao transacao) sut = conta.CreditarValor(100, "teste");
+        Assert.Equal(200, sut.conta.Saldo);
     }
 
     [Fact]
@@ -27,9 +29,9 @@ public class ContaTests
             Saldo = 100,
             Limite = 100000
         };
-        (bool result, Conta sut) = conta.DebitarValor(100, "teste", out var _);
-        Assert.True(result);
-        Assert.Equal(0, sut.Saldo);
+        Result<(Conta conta, Transacao transacao)> sut = conta.DebitarValor(100, "teste");
+        Assert.True(sut.IsSuccess);
+        Assert.Equal(0, sut.Value.conta.Saldo);
     }
 
     [Fact]
@@ -42,10 +44,10 @@ public class ContaTests
             Limite = 1000
         };
 
-        (bool result, Conta _) = conta.DebitarValor(1001, "teste", out var _);
+        Result<(Conta conta, Transacao transacao)> sut = conta.DebitarValor(1001, "teste");
 
-        Assert.False(result);
-        Assert.Equal(0, conta.Saldo);
+        Assert.True(sut.IsFailure);
+        Assert.Equal(default, sut.Value);
     }
 
 //    [Fact]
@@ -78,10 +80,10 @@ public class ContaTests
         };
 
         for (int i = 0; i < 15; i++)
-            conta.CreditarValor(100, "teste", out var _);
+            conta.CreditarValor(100, "teste");
 
         for (int i = 0; i < 15; i++)
-            conta.DebitarValor(200, "teste", out var _);
+            conta.DebitarValor(200, "teste");
 
         Assert.Equal(10, conta.Extrato.Count);
     }

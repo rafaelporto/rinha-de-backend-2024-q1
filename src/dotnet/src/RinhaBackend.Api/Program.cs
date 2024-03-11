@@ -1,7 +1,6 @@
-using RinhaBackend.Api;
 using RinhaBackend.Api.Endpoints;
 
-var builder = ClusterBuilder.CreateBuilder(args);
+WebApplicationBuilder builder = ClusterBuilder.CreateBuilder(args);
 
 builder.Services.ConfigureServices();
 
@@ -19,4 +18,6 @@ app.UseSwagger()
 app.MapPostTransacao();
 app.MapGetExtrato();
 
-app.Run();
+await app.RunAsync();
+
+return 0;

@@ -2,17 +2,15 @@ version: "3.4"
 
 services:
   api01: &api
-    image: rafaelporto/rinha-2024q1:dev
+    image: rafaelporto/rinha-2024q1:arm64
     hostname: api-01
     build:
       context: .
       dockerfile: src/RinhaBackend.Api/Dockerfile
     environment: &env
-      ClusterConfig__ConnectionString: "server=db; port=3306; database=rinhadb; user=rinha; password=rinha; Persist Security Info=False; Connect Timeout=300"
+      ClusterConfig__ConnectionString: "server=rinhadb; port=3306; database=rinhadb; user=rinha; password=rinha; Persist Security Info=False; Connect Timeout=300"
       ASPNETCORE_URLS: http://*:9997
       ASPETCORE_ENVIRONMENT: Production
-    ports:
-      - 9997:9997
     depends_on:
       db:
         condition: service_healthy
@@ -20,7 +18,7 @@ services:
       resources:
         limits:
           cpus: "0.3"
-          memory: "150MB"
+          memory: "100MB"
 
   api02:
     <<: *api
@@ -28,8 +26,6 @@ services:
     environment:
       <<: *env
       ASPNETCORE_URLS: http://*:9998
-    ports:
-      - 9998:9998
 
   nginx:
     image: nginx:latest
@@ -67,7 +63,7 @@ services:
           "root",
           "-p$$MYSQL_ROOT_PASSWORD",
         ]
-      timeout: 20s
+      timeout: 5s
       retries: 10
     ports:
       - "3306:3306"
@@ -78,7 +74,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: "240MB"
+          memory: "340MB"
 
 networks:
   default:

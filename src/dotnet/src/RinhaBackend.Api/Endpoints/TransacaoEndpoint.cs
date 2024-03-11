@@ -1,5 +1,4 @@
-using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 using RinhaBackend.Api.Grains;
 using RinhaBackend.Api.Models;
 
@@ -11,48 +10,68 @@ public static class TransacaoEndpoint
     {
         return app.MapPost("/clientes/{id:regex([1-5])}/transacoes",
                     async (int id,
-                     [FromBody] Transacao transacao,
-                     IGrainFactory grains) =>
+                        IGrainFactory grains,
+                        Stream requestBody, HttpResponse response) =>
         {
-            if (transacao.IsInvalid())
-                return Results.UnprocessableEntity();
+            var rawBody = await new StreamReader(requestBody).ReadToEndAsync();
 
-            if (int.TryParse(transacao.Valor.ToString(), out int valor) is false)
-                return Results.UnprocessableEntity();
+            response.ContentType = "application/json";
 
-            if (valor <= 0)
-                return Results.UnprocessableEntity();
-
-            var conta = grains.GetGrain<IContaGrain>(id);
-
-            if (transacao.IsDebito)
+            if (string.IsNullOrWhiteSpace(rawBody))
             {
-                (bool valido, ContaSaldo saldo) = await conta.DebitarValor((uint)valor,
-                                                transacao.Descricao!);
-
-                return valido
-                    ? Results.Ok(saldo)
-                    : Results.UnprocessableEntity();
+                response.StatusCode = 422;
+                return;
             }
 
-            return Results.Ok(await conta.CreditarValor((uint)valor, transacao.Descricao!));
+            JsonDocument body = JsonDocument.Parse(rawBody);
+
+            var transacaoResult = IsValid(body);
+
+            if (transacaoResult.IsFailure)
+            {
+                response.StatusCode = 422;
+                return;
+            }
+
+            var transacao = transacaoResult.Value;
+            var conta = grains.GetGrain<IContaGrain>(id);
+
+            GrainResponse result = transacao.EhDebito ?
+                await conta.DebitarValor(transacao) :
+                await conta.CreditarValor(transacao);
+
+            response.StatusCode = result.Code;
+            
+            if (result.IsSuccess)
+                await response.Body.WriteAsync(result.Body);
         });
     }
-}
 
-public record Transacao(object Valor, char? Tipo, string? Descricao)
-{
-    [JsonIgnore]
-    public bool IsDebito => Tipo == 'd';
-
-    public bool IsValid()
+    private static Result<TransacaoRequest> IsValid(JsonDocument body)
     {
-        return Valor is not null
-        && Tipo.HasValue
-        && string.IsNullOrWhiteSpace(Descricao) is false
-        && Descricao.Length <= 10
-        && (Tipo == 'd' || Tipo == 'c');
-    }
+        if (body.RootElement.GetProperty("valor").TryGetDouble(out var valor) is false)
+            return Result.Failure<TransacaoRequest>();
 
-    public bool IsInvalid() => !IsValid();
+        if (valor == 0 || (valor % 1) != 0)
+            return Result.Failure<TransacaoRequest>();
+
+        var tipoStr = body.RootElement.GetProperty("tipo").GetString();
+
+        if (string.IsNullOrWhiteSpace(tipoStr))
+            return Result.Failure<TransacaoRequest>();
+
+        if (tipoStr != "d" && tipoStr != "c")
+            return Result.Failure<TransacaoRequest>();
+
+        var descricao = body.RootElement.GetProperty("descricao").GetString();
+
+        if (string.IsNullOrWhiteSpace(descricao) || descricao.Length > 10)
+            return Result.Failure<TransacaoRequest>();
+
+        char tipo = tipoStr == "d" ? 'd' : 'c';
+
+        TransacaoRequest transacao = new(Convert.ToUInt32(valor), tipo, descricao);
+
+        return Result.Success(transacao);
+    }
 }

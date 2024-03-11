@@ -6,13 +6,17 @@ public static class ExtratoEndpoint
 {
     public static RouteHandlerBuilder MapGetExtrato(this IEndpointRouteBuilder app)
     {
-        return app.MapGet("/clientes/{id:regex([1-5])}/extrato", async (int id, IGrainFactory grains) =>
+        return app.MapGet("/clientes/{id:regex([1-5])}/extrato",
+            async (int id, IGrainFactory grains, HttpResponse response) =>
         {
             var conta = grains.GetGrain<IContaGrain>(id);
-            var extrato = await conta.ObterExtrato();
-            return Results.Ok(extrato);
-        })
-        .WithName("GetExtrato")
-        .WithOpenApi();
+            GrainResponse grainResponse = await conta.ObterExtrato();
+
+            response.ContentType = "application/json";
+            response.StatusCode = grainResponse.Code;
+            
+            if (grainResponse.IsSuccess)
+                await response.Body.WriteAsync(grainResponse.Body);
+        });
     }
 }

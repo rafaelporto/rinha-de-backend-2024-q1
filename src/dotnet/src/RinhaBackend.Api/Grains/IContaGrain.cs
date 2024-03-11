@@ -1,3 +1,4 @@
+using RinhaBackend.Api.Endpoints;
 using RinhaBackend.Api.Models;
 
 namespace RinhaBackend.Api.Grains;
@@ -6,11 +7,11 @@ namespace RinhaBackend.Api.Grains;
 public interface IContaGrain : IGrainWithIntegerKey
 {
     [Alias("CreditarValor")]
-    ValueTask<ContaSaldo> CreditarValor(uint valor, string descricao);
+    ValueTask<GrainResponse> CreditarValor(TransacaoRequest transacao);
 
     [Alias("DebitarValor")]
-    ValueTask<(bool valido, ContaSaldo saldo)> DebitarValor(uint valor, string descricao);
+    ValueTask<GrainResponse> DebitarValor(TransacaoRequest transacao);
 
     [Alias("ObterExtrato")]
-    ValueTask<ContaExtrato> ObterExtrato();
+    ValueTask<GrainResponse> ObterExtrato();
 }

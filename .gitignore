@@ -2,3 +2,6 @@
 **/obj/
 **/.vscode/
 **/.metals/
+**/.sqllsrc.json
+**.DS_Store
+load-test/user-files/results/

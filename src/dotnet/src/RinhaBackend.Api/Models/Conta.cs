@@ -20,22 +20,21 @@ public sealed class Conta
         return Id > 0 && Limite > 0;
     }
 
-    public Conta CreditarValor(uint valor, string descricao, out Transacao transacao)
+    public (Conta conta, Transacao transacao) CreditarValor(uint valor, string descricao)
     {
         Saldo += (int)valor;
-        transacao = AdicionarEntradaExtrato(descricao, valor, 'c');
-        return this;
+        var transacao = AdicionarEntradaExtrato(descricao, valor, 'c');
+        return (this, transacao);
     }
 
-    public (bool, Conta) DebitarValor(uint valor, string descricao, out Transacao? transacao)
+    public Result<(Conta conta, Transacao transacao)> DebitarValor(uint valor, string descricao)
     {
-        transacao = null;
         if (Saldo + Limite - valor < 0)
-            return (false, this);
+            return Result.Failure<(Conta, Transacao)>();
 
         Saldo -= (int)valor;
-        transacao = AdicionarEntradaExtrato(descricao, valor, 'd');
-        return (true, this);
+        var transacao = AdicionarEntradaExtrato(descricao, valor, 'd');
+        return Result.Success((this, transacao));
     }
 
     public ContaSaldo ObterSaldo()
